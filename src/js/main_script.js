@@ -5,6 +5,7 @@ import { fetchRequest } from './fetch_request';
 
 const searchForm = document.getElementById('search-form');
 const gallery = document.querySelector('.gallery');
+const btnLoadMore = document.querySelector('.load-more');
 
 let query = '';
 let page = 1;
@@ -52,11 +53,6 @@ function renderGallery(images) {
   const { height: cardHeight } = document
     .querySelector('.gallery')
     .firstElementChild.getBoundingClientRect();
-
-  window.scrollBy({
-    top: cardHeight * 2,
-    behavior: 'smooth',
-  });
 }
 
 function onSearchForm(e) {
@@ -64,6 +60,8 @@ function onSearchForm(e) {
   page = 1;
   query = e.currentTarget.elements.searchQuery.value.trim();
   gallery.innerHTML = '';
+  btnLoadMore.classList.add('is-hidden');
+  btnLoadMore.addEventListener('click', onloadMore);
 
   if (query === '') {
     Notiflix.Notify.failure(
@@ -73,15 +71,19 @@ function onSearchForm(e) {
   }
 
   fetchRequest(query, page, perPage)
-    .then(data => {
-      if (data.totalHits === 0) {
+    .then(({ totalHits, hits }) => {
+      if (totalHits === 0) {
         Notiflix.Notify.failure(
           'Sorry, there are no images matching your search query. Please try again.'
         );
       } else {
-        renderGallery(data.hits);
+        renderGallery(hits);
         simpleLightBox = new SimpleLightbox('.gallery a').refresh();
-        Notiflix.Notify.success(`Hooray! We found ${data.totalHits} images.`);
+        Notiflix.Notify.success(`Hooray! We found ${totalHits} images.`);
+        const totalPages = Math.ceil(totalHits / perPage);
+        if (totalPages > 1) {
+          btnLoadMore.classList.remove('is-hidden');
+        }
       }
     })
     .catch(error => console.log(error))
@@ -96,44 +98,17 @@ function onloadMore() {
   // simpleLightBox.refresh();
 
   fetchRequest(query, page, perPage)
-    .then(data => {
-      renderGallery(data.hits);
+    .then(({ hits, totalHits }) => {
+      renderGallery(hits);
       simpleLightBox = new SimpleLightbox('.gallery a').refresh();
 
-      const totalPages = Math.ceil(data.totalHits / perPage);
-
-      if (page > totalPages) {
+      const totalPages = Math.ceil(totalHits / perPage);
+      if (page >= totalPages) {
         Notiflix.Notify.failure(
           "We're sorry, but you've reached the end of search results."
         );
+        btnLoadMore.classList.add('is-hidden');
       }
     })
     .catch(error => console.log(error));
 }
-
-function checkIfEndOfPage() {
-  return (
-    window.innerHeight + window.pageYOffset >=
-    document.documentElement.scrollHeight
-  );
-}
-
-// Функція, яка виконуеться, якщо користувач дійшов до кінця сторінки
-function showLoadMorePage() {
-  if (checkIfEndOfPage()) {
-    onloadMore();
-  }
-}
-
-// Додати подію на прокручування сторінки, яка викликає функцію showLoadMorePage
-window.addEventListener('scroll', showLoadMorePage);
-
-// кнопка “вгору”->
-arrowTop.onclick = function () {
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-  // після scrollTo відбудеться подія "scroll", тому стрілка автоматично сховається
-};
-
-window.addEventListener('scroll', function () {
-  arrowTop.hidden = scrollY < document.documentElement.clientHeight;
-});
